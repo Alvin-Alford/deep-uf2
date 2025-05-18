@@ -15,6 +15,12 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Clone MicroPython
+      run: |
+        git clone --depth 1 --branch v1.23 https://github.com/micropython/micropython.git
+        cd micropython
+        git submodule update --init --recursive
+
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -25,7 +31,7 @@ jobs:
         export PICO_SDK_PATH=$GITHUB_WORKSPACE/micropython/lib/pico-sdk
         echo "PICO_SDK_PATH=$PICO_SDK_PATH" >> $GITHUB_ENV
 
-    - name: Configure build with HID and Wireless
+    - name: Configure build
       run: |
         cd micropython/ports/rp2
         sed -i '/MICROPY_HW_ENABLE_USB_HID/s/0/1/' boards/PICO/mpconfigport.h
