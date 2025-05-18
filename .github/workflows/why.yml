@@ -1,0 +1,40 @@
+name: Build MicroPython for Pico W with USB HID
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout MicroPython
+      uses: actions/checkout@v3
+      with:
+        repository: micropython/micropython
+        submodules: true
+
+    - name: Install toolchain and dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y gcc-arm-none-eabi cmake make git libnewlib-arm-none-eabi
+
+    - name: Enable machine.usbdevice in Pico W build
+      run: |
+        cd ports/rp2
+        echo 'MICROPY_PY_MACHINE_USBDEVICE = 1' >> mpconfigport.mk
+
+    - name: Build firmware for Pico W
+      run: |
+        make -C mpy-cross
+        cd ports/rp2
+        make submodules
+        make BOARD=PICO_W -j$(nproc)
+
+    - name: Upload firmware.uf2
+      uses: actions/upload-artifact@v3
+      with:
+        name: micropython-picow-hid
+        path: ports/rp2/build-PICO_W/firmware.uf2
