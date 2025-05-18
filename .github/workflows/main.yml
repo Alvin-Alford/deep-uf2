@@ -1,46 +1,63 @@
-name: Build MicroPython for Pico 2W
+name: Build Custom MicroPython
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches: [ main ]
+
+env:
+  MPY_REPO: https://github.com/micropython/micropython.git
+  BOARD: PICO_W
 
 jobs:
-  build-micropython:
+  build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Clone MicroPython
-      run: |
-        git clone --depth 1 https://github.com/micropython/micropython.git
-        cd micropython
-        git checkout tags/v1.23.0 -b v1.23-build
-        git submodule update --init --recursive lib/pico-sdk
-
+      
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi \
-            build-essential libusb-1.0-0-dev python3
+        sudo apt-get install -y \
+            cmake \
+            gcc-arm-none-eabi \
+            libnewlib-arm-none-eabi \
+            build-essential \
+            python3 \
+            python3-pip \
+            git \
+            wget
 
-    - name: Configure build
+    - name: Clone MicroPython
+      run: |
+        git clone --recurse-submodules $MPY_REPO
+        cd micropython
+        git submodule update --init lib/pico-sdk lib/tinyusb
+
+    - name: Patch configuration
       run: |
         cd micropython/ports/rp2
-        sed -i '/MICROPY_HW_ENABLE_USB_HID/s/0/1/' boards/PICO/mpconfigport.h
-        sed -i '/MICROPY_PY_BLUETOOTH/s/0/1/' boards/PICO/mpconfigport.h
-        sed -i '/MICROPY_PY_NETWORK_CYW43/s/0/1/' boards/PICO/mpconfigport.h
-        echo "set(PICO_BOARD pico_w)" >> boards/PICO/CMakeLists.txt
+        # Enable USB HID
+        sed -i 's/#define MICROPY_HW_USB_HID 0/#define MICROPY_HW_USB_HID 1/' boards/$BOARD/mpconfigboard.h
+        # Enable Bluetooth
+        sed -i 's/#define MICROPY_PY_BLUETOOTH 0/#define MICROPY_PY_BLUETOOTH 1/' mpconfigport.h
+        # Increase HID buffer size
+        echo "#define MICROPY_HW_USB_HID_BUFSIZE 512" >> boards/$BOARD/mpconfigboard.h
 
-    - name: Build MicroPython
+    - name: Build mpy-cross
+      run: |
+        cd micropython/mpy-cross
+        make
+
+    - name: Build port
       run: |
         cd micropython/ports/rp2
-        make BOARD=PICO -j4
+        make BOARD=$BOARD clean
+        make BOARD=$BOARD
 
-    - name: Upload UF2 artifact
+    - name: Upload UF2 Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: firmware.uf2
-        path: micropython/ports/rp2/build-PICO/firmware.uf2
+        name: micropython-pico2w.uf2
+        path: micropython/ports/rp2/build-$BOARD/firmware.uf2
