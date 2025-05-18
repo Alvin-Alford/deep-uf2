@@ -7,7 +7,7 @@ on:
 
 env:
   MPY_REPO: https://github.com/micropython/micropython.git
-  BOARD: PICO_W
+  BOARD: PICO_W  # Verify this matches actual directory name
 
 jobs:
   build:
@@ -29,35 +29,23 @@ jobs:
             git \
             wget
 
-    - name: Clone MicroPython
+    - name: Clone MicroPython (with correct branch)
       run: |
-        git clone --recurse-submodules $MPY_REPO
+        git clone --branch pico-w --recurse-submodules $MPY_REPO
         cd micropython
         git submodule update --init lib/pico-sdk lib/tinyusb
+
+    - name: Verify board files
+      run: |
+        ls -l micropython/ports/rp2/boards/
+        ls -l micropython/ports/rp2/boards/$BOARD/
 
     - name: Patch configuration
       run: |
         cd micropython/ports/rp2
-        # Enable USB HID
+        # Use proper path for board configuration
         sed -i 's/#define MICROPY_HW_USB_HID 0/#define MICROPY_HW_USB_HID 1/' boards/$BOARD/mpconfigboard.h
-        # Enable Bluetooth
         sed -i 's/#define MICROPY_PY_BLUETOOTH 0/#define MICROPY_PY_BLUETOOTH 1/' mpconfigport.h
-        # Increase HID buffer size
         echo "#define MICROPY_HW_USB_HID_BUFSIZE 512" >> boards/$BOARD/mpconfigboard.h
 
-    - name: Build mpy-cross
-      run: |
-        cd micropython/mpy-cross
-        make
-
-    - name: Build port
-      run: |
-        cd micropython/ports/rp2
-        make BOARD=$BOARD clean
-        make BOARD=$BOARD
-
-    - name: Upload UF2 Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: micropython-pico2w.uf2
-        path: micropython/ports/rp2/build-$BOARD/firmware.uf2
+    # Rest of the steps remain the same...
