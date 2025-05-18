@@ -1,51 +1,69 @@
-name: Build Custom MicroPython
+name: Build MicroPython Pico 2W Firmware
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-
-env:
-  MPY_REPO: https://github.com/micropython/micropython.git
-  BOARD: PICO_W  # Verify this matches actual directory name
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-micropython-firmware:
     runs-on: ubuntu-latest
+    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Install dependencies
+    - name: Checkout MicroPython Repository
+      uses: actions/checkout@v3
+      with:
+        repository: micropython/micropython
+        submodules: recursive
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    
+    - name: Install Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-            cmake \
-            gcc-arm-none-eabi \
-            libnewlib-arm-none-eabi \
-            build-essential \
-            python3 \
-            python3-pip \
-            git \
-            wget
-
-    - name: Clone MicroPython (with correct branch)
+          cmake \
+          gcc-arm-none-eabi \
+          libnewlib-arm-none-eabi \
+          libstdc++-arm-none-eabi-newlib \
+          python3-pip
+        
+        pip install pyserial
+    
+    - name: Prepare Pico SDK
       run: |
-        git clone --branch pico-w --recurse-submodules $MPY_REPO
-        cd micropython
-        git submodule update --init lib/pico-sdk lib/tinyusb
-
-    - name: Verify board files
+        git clone https://github.com/raspberrypi/pico-sdk.git
+        echo "PICO_SDK_PATH=$GITHUB_WORKSPACE/pico-sdk" >> $GITHUB_ENV
+    
+    - name: Configure Firmware Build
+      working-directory: ports/rp2
       run: |
-        ls -l micropython/ports/rp2/boards/
-        ls -l micropython/ports/rp2/boards/$BOARD/
-
-    - name: Patch configuration
+        # Enable USB HID
+        sed -i 's/# MICROPY_PY_USBD/MICROPY_PY_USBD/g' mpconfigport.h
+        
+        # Enable Bluetooth Support
+        sed -i 's/# MICROPY_PY_BLUETOOTH/MICROPY_PY_BLUETOOTH/g' mpconfigport.h
+        
+        # Additional Bluetooth Configuration
+        echo "#define MICROPY_PY_BLUETOOTH_USE_NIMBLE (1)" >> mpconfigport.h
+        
+        # USB HID Keyboard and Mouse
+        echo "#define MICROPY_HID_KEYBOARD (1)" >> mpconfigport.h
+        echo "#define MICROPY_HID_MOUSE (1)" >> mpconfigport.h
+    
+    - name: Build MicroPython Firmware
+      working-directory: ports/rp2
       run: |
-        cd micropython/ports/rp2
-        # Use proper path for board configuration
-        sed -i 's/#define MICROPY_HW_USB_HID 0/#define MICROPY_HW_USB_HID 1/' boards/$BOARD/mpconfigboard.h
-        sed -i 's/#define MICROPY_PY_BLUETOOTH 0/#define MICROPY_PY_BLUETOOTH 1/' mpconfigport.h
-        echo "#define MICROPY_HW_USB_HID_BUFSIZE 512" >> boards/$BOARD/mpconfigboard.h
-
-    # Rest of the steps remain the same...
+        make BOARD=PICO_2W
+    
+    - name: Upload UF2 Firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: pico-2w-micropython-firmware
+        path: ports/rp2/build-PICO_2W/firmware.uf2
+        retention-days: 30
