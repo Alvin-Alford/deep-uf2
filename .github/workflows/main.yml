@@ -63,11 +63,11 @@ jobs:
       working-directory: ports/rp2
       run: |
         # Correct board name
-        make BOARD=RPI_PICO_2W V=1
+        make BOARD=RPI_PICO2_W V=1
     
     - name: Upload UF2 Firmware
       uses: actions/upload-artifact@v4
       with:
         name: rpi-pico-2w-micropython-firmware
-        path: ports/rp2/build-RPI_PICO_2W/firmware.uf2
+        path: ports/rp2/build-RPI_PICO2_W/firmware.uf2
         retention-days: 30
