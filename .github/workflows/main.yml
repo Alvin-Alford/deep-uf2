@@ -13,13 +13,13 @@ jobs:
     
     steps:
     - name: Checkout MicroPython Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: micropython/micropython
         submodules: recursive
     
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
     
@@ -62,7 +62,7 @@ jobs:
         make BOARD=PICO_2W
     
     - name: Upload UF2 Firmware
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pico-2w-micropython-firmware
         path: ports/rp2/build-PICO_2W/firmware.uf2
