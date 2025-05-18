@@ -12,24 +12,19 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Clone MicroPython
       run: |
-        git clone --depth 1 --branch v1.23 https://github.com/micropython/micropython.git
+        git clone --depth 1 https://github.com/micropython/micropython.git
         cd micropython
-        git submodule update --init --recursive
+        git checkout tags/v1.23.0 -b v1.23-build
+        git submodule update --init --recursive lib/pico-sdk
 
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential libusb-1.0-0-dev python3
-
-    - name: Set up environment
-      run: |
-        export PICO_SDK_PATH=$GITHUB_WORKSPACE/micropython/lib/pico-sdk
-        echo "PICO_SDK_PATH=$PICO_SDK_PATH" >> $GITHUB_ENV
+        sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            build-essential libusb-1.0-0-dev python3
 
     - name: Configure build
       run: |
@@ -37,12 +32,11 @@ jobs:
         sed -i '/MICROPY_HW_ENABLE_USB_HID/s/0/1/' boards/PICO/mpconfigport.h
         sed -i '/MICROPY_PY_BLUETOOTH/s/0/1/' boards/PICO/mpconfigport.h
         sed -i '/MICROPY_PY_NETWORK_CYW43/s/0/1/' boards/PICO/mpconfigport.h
-        echo "CM_BUILD = PICO_W" >> boards/PICO/build-PICO/CMakeLists.txt
+        echo "set(PICO_BOARD pico_w)" >> boards/PICO/CMakeLists.txt
 
     - name: Build MicroPython
       run: |
         cd micropython/ports/rp2
-        make BOARD=PICO clean
         make BOARD=PICO -j4
 
     - name: Upload UF2 artifact
